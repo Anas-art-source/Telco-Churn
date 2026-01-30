@@ -7,14 +7,15 @@ A production-ready REST API for predicting customer churn using XGBoost with SMO
 ## Table of Contents
 
 1. [Project Overview](#project-overview)
-2. [EDA Insights & Assumptions](#eda-insights--assumptions)
-3. [Feature Engineering](#feature-engineering)
-4. [Model Selection](#model-selection)
-5. [API Documentation](#api-documentation)
-6. [Quick Start](#quick-start)
-7. [Testing](#testing)
-8. [Docker Deployment](#docker-deployment)
-9. [Production Considerations](#production-considerations)
+2. [Project Structure](#project-structure)
+3. [EDA Insights & Assumptions](#eda-insights--assumptions)
+4. [Feature Engineering](#feature-engineering)
+5. [Model Selection](#model-selection)
+6. [API Documentation](#api-documentation)
+7. [Quick Start](#quick-start)
+8. [Testing](#testing)
+9. [Docker Deployment](#docker-deployment)
+10. [Production Considerations](#production-considerations)
 
 ---
 
@@ -26,6 +27,27 @@ This project implements a binary classification model to predict whether a telec
 - **XGBoost classifier** with SMOTE for class imbalance handling
 - **FastAPI REST API** with input validation and graceful error handling
 - **Comprehensive test suite** with pytest
+
+---
+
+## Project Structure
+
+```
+├── app.py              # FastAPI application
+├── train.py            # Model training script
+├── src/
+│   ├── config.py       # Configuration and constants
+│   └── preprocessing.py # Feature engineering pipeline
+├── models/
+│   ├── model.pkl       # Trained XGBoost model
+│   └── preprocessor.pkl # Preprocessing artifacts
+├── data/
+│   └── WA_Fn-UseC_-Telco-Customer-Churn.csv
+├── test_app.py         # Pytest test suite
+├── requirements.txt    # Python dependencies
+├── Dockerfile          # Container configuration
+└── README.md           # This documentation
+```
 
 ---
 
@@ -360,24 +382,3 @@ docker run -p 8000:8000 --health-cmd="curl -f http://localhost:8000/health" chur
 | Inference latency (p99) | ~15ms                        |
 | Throughput              | ~500 req/sec (single worker) |
 | Model size              | ~150KB                       |
-
----
-
-## Project Structure
-
-```
-├── app.py              # FastAPI application
-├── train.py            # Model training script
-├── src/
-│   ├── config.py       # Configuration and constants
-│   └── preprocessing.py # Feature engineering pipeline
-├── models/
-│   ├── model.pkl       # Trained XGBoost model
-│   └── preprocessor.pkl # Preprocessing artifacts
-├── data/
-│   └── WA_Fn-UseC_-Telco-Customer-Churn.csv
-├── test_app.py         # Pytest test suite
-├── requirements.txt    # Python dependencies
-├── Dockerfile          # Container configuration
-└── README.md           # This documentation
-```
