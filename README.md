@@ -381,13 +381,3 @@ docker run -p 8000:8000 --health-cmd="curl -f http://localhost:8000/health" chur
 ├── Dockerfile          # Container configuration
 └── README.md           # This documentation
 ```
-
----
-
-## Author
-
-Senior ML Engineer - Zendesk Take-Home Assignment
-
-## License
-
-MIT License
