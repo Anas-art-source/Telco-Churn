@@ -7,12 +7,12 @@ A production-ready REST API for predicting customer churn using XGBoost with SMO
 ## Table of Contents
 
 1. [Project Overview](#project-overview)
-2. [Project Structure](#project-structure)
-3. [EDA Insights & Assumptions](#eda-insights--assumptions)
-4. [Feature Engineering](#feature-engineering)
-5. [Model Selection](#model-selection)
-6. [API Documentation](#api-documentation)
-7. [Quick Start](#quick-start)
+2. [Quick Start & Setup](#quick-start--setup)
+3. [Project Structure](#project-structure)
+4. [API Design & Response Structure](#api-design--response-structure)
+5. [EDA Insights & Assumptions](#eda-insights--assumptions)
+6. [Feature Engineering](#feature-engineering)
+7. [Model Selection](#model-selection)
 8. [Testing](#testing)
 9. [Docker Deployment](#docker-deployment)
 10. [Production Considerations](#production-considerations)
@@ -27,6 +27,47 @@ This project implements a binary classification model to predict whether a telec
 - **XGBoost classifier** with SMOTE for class imbalance handling
 - **FastAPI REST API** with input validation and graceful error handling
 - **Comprehensive test suite** with pytest
+
+---
+
+## Quick Start & Setup
+
+### 1. Prerequisites
+
+- Python 3.9+
+- [Homebrew](https://brew.sh/) (on macOS for `libomp`)
+
+### 2. Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/Anas-art-source/Telco-Churn.git
+cd Telco-Churn
+
+# Install OpenMP (Requirement for XGBoost on macOS)
+brew install libomp
+
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### 3. Training the Model
+
+```bash
+python train.py
+```
+
+### 4. Running the API
+
+```bash
+uvicorn app:app --reload
+```
+
+The API will be available at: `http://localhost:8000`
 
 ---
 
@@ -53,6 +94,10 @@ This project implements a binary classification model to predict whether a telec
 
 ## EDA Insights & Assumptions
 
+### Hypothesis-Driven Approach
+
+Before conducting EDA, I formulated specific hypotheses about churn drivers based on domain knowledge of telecom industry. Each hypothesis was then systematically tested using statistical methods.
+
 ### Validated Assumptions ✓
 
 | Assumption                                 | Validation Method                                  | Finding                                                     |
@@ -64,6 +109,57 @@ This project implements a binary classification model to predict whether a telec
 | **Fiber optic has higher churn**           | Cross-tabulation with InternetService              | Confirmed: 42% churn rate vs 19% for DSL                    |
 | **New customers (tenure < 12) churn more** | Tenure group analysis                              | Confirmed: 47% churn rate for tenure ≤ 12 months            |
 | **Senior citizens churn more**             | SeniorCitizen vs Churn analysis                    | Confirmed: 41% vs 24% for non-seniors                       |
+
+### Statistical Validation: Chi-Square Tests
+
+All categorical features were tested against Churn using Chi-Square tests of independence:
+
+| Feature          | χ² Value   | p-value   | Significance | Interpretation                                           |
+| ---------------- | ---------- | --------- | ------------ | -------------------------------------------------------- |
+| Contract         | **1184.6** | 5.86e-258 | \*\*\*       | Strongest predictor of churn                             |
+| OnlineSecurity   | **850.0**  | 2.66e-185 | \*\*\*       | Lack of security services → higher churn                 |
+| TechSupport      | **828.2**  | 1.44e-180 | \*\*\*       | No tech support → higher churn                           |
+| InternetService  | **732.3**  | 9.57e-160 | \*\*\*       | Fiber optic users churn most                             |
+| PaymentMethod    | **648.1**  | 3.68e-140 | \*\*\*       | Electronic check → highest churn                         |
+| PaperlessBilling | **258.3**  | 4.07e-58  | \*\*\*       | Paperless billing → higher churn                         |
+| Partner          | **158.7**  | 2.14e-36  | \*\*\*       | No partner → higher churn                                |
+| Dependents       | **189.1**  | 4.92e-43  | \*\*\*       | No dependents → higher churn                             |
+| gender           | 0.48       | 0.49      | ns           | **Not significant** – Gender doesn't matter              |
+| PhoneService     | 0.92       | 0.34      | ns           | **Not significant** – Phone service alone doesn't matter |
+
+> **Key Insight:** Gender and phone service are NOT statistically significant predictors of churn (p > 0.05). This saved model complexity by excluding irrelevant features.
+
+### Tenure Analysis Deep-Dive
+
+**Hypothesis:** Newer customers are flight risks.
+
+**Validation:**
+
+- **0-12 months:** 47.7% churn rate (VERY HIGH RISK)
+- **12-24 months:** 28.0% churn rate
+- **24-48 months:** 16.5% churn rate
+- **48+ months:** 9.5% churn rate (VERY LOW RISK)
+
+**Finding:** New customers churn **5x more** than long-term customers. This led to creating the `is_new_customer` feature.
+
+### Surprising Finding: Fiber Optic Churn
+
+**Initial Hypothesis:** Fiber optic = premium service → lower churn.
+
+**Actual Finding:**
+
+- Fiber optic: **41.9% churn** (HIGHEST)
+- DSL: 19.0% churn
+- No internet: 7.4% churn (LOWEST)
+
+**Interpretation:** The hypothesis was **WRONG**. Fiber optic leads to more churn, possibly because:
+
+1. Higher price → increased price sensitivity
+2. Higher expectations not being met
+3. More competitive market for fiber
+4. Technical issues with fiber rollout
+
+This counterintuitive finding is captured in the `has_fiber` feature as a **risk indicator**.
 
 ### Assumptions NOT Validated ✗
 
@@ -186,7 +282,19 @@ The XGBoost model identified the following features as most predictive of churn:
 
 ---
 
-## API Documentation
+## API Design & Response Structure
+
+### Structured JSON Responses
+
+The API uses Pydantic to enforce a strict, predictable response structure. Every prediction request returns a JSON object with consistent types:
+
+```json
+{
+  "churn_probability": 0.7234, // Float [0.0 - 1.0]
+  "prediction": "Yes", // String ["Yes", "No"]
+  "risk_level": "High" // String ["Low", "Medium", "High"]
+}
+```
 
 ### Endpoints
 
@@ -289,48 +397,6 @@ curl -X POST "http://localhost:8000/predict" \
 | < 0.3             | Low        | Standard service                 |
 | 0.3 - 0.7         | Medium     | Proactive engagement             |
 | > 0.7             | High       | Immediate retention intervention |
-
----
-
-## Quick Start
-
-### 1. Setup Environment
-
-```bash
-cd "/Users/Apple/Desktop/Telco Churn"
-
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### 2. Train Model
-
-```bash
-python train.py
-```
-
-Expected output:
-
-```
-✓ Accuracy:  0.7672 (76.72%)
-✓ Precision: 0.5469 (54.69%)
-✓ Recall:    0.7166 (71.66%)
-✓ ROC-AUC:   0.8336
-```
-
-### 3. Start API
-
-```bash
-uvicorn app:app --reload
-```
-
-Visit: http://localhost:8000/docs
-
----
 
 ## Testing
 
